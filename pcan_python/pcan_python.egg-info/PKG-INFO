@@ -1,0 +1,10 @@
+Metadata-Version: 1.0
+Name: pcan-python
+Version: 0.1.dev0
+Summary: UNKNOWN
+Home-page: UNKNOWN
+Author: UNKNOWN
+Author-email: UNKNOWN
+License: BSD
+Description: This driver is a Python wrapper of the  peak-linux-driver (in C) for Linux.
+Platform: UNKNOWN
