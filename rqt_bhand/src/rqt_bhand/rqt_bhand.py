@@ -47,12 +47,16 @@ from bhand_controller.srv import Actions, SetControlMode
 from sensor_msgs.msg import JointState
 from rospy.exceptions import ROSException
 
+from tact_maps import tact_to_finger1_map, tact_to_finger2_map, tact_to_finger3_map, tact_to_palm_map
+
 #angles
 max_base_spread = 3.14
 max_finger_spread = 2.44
 
 MAX_VELOCITY = 0.1 # rad/s
 BHAND_VELOCITY_COMMANDS_FREQ = 50 # Frequency of vel publications in ms
+
+
 
 class BHandGUI(Plugin):
 	
@@ -101,7 +105,7 @@ class BHandGUI(Plugin):
 		
 		self.state_string = " "
 		
-		
+
 		# UI
 		ui_file = os.path.join(rp.get_path('rqt_bhand'), 'resource', 'BHandGUI.ui')
 		loadUi(ui_file, self._widget)
@@ -730,6 +734,9 @@ class BHandGUI(Plugin):
 					else:
 						color_string = self.black_string
 					getattr(self._widget,lcd_string).setStyleSheet(color_string)
+
+					if self.THRESHOLD <= value:
+						self.publishLocation("bh_finger{}_tact{}", value)
 				
 			#Palm
 			for i in range(0,24):
