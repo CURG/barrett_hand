@@ -38,12 +38,16 @@ from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt, QTimer, Slot, QBasicTimer, SIGNAL
 from python_qt_binding.QtGui import QKeySequence, QShortcut, QWidget, QPixmap, QMessageBox, QStandardItemModel,QStandardItem
 from rqt_gui_py.plugin import Plugin
+import tf_conversions.posemath as pm
+import tf
 
 import time
 import math
 
 from bhand_controller.msg import State, TactileArray, Service
 from bhand_controller.srv import Actions, SetControlMode
+from barrett_tactile_msgs.msg import TactileInfo
+from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import JointState
 from rospy.exceptions import ROSException
 
@@ -55,8 +59,6 @@ max_finger_spread = 2.44
 
 MAX_VELOCITY = 0.1 # rad/s
 BHAND_VELOCITY_COMMANDS_FREQ = 50 # Frequency of vel publications in ms
-
-
 
 class BHandGUI(Plugin):
 	
@@ -120,7 +122,7 @@ class BHandGUI(Plugin):
 		
 				
 		if context.serial_number() > 1:
-			self._widget.setWindowTitle(self._widget.windowTitle() + (' (%d)' % context.serial_number()))		
+			self._widget.setWindowTitle(self._widget.windowTitle() + (' (%d)' % context.serial_number()))       
 		
 		# Adds this widget to the context
 		context.add_widget(self._widget)
@@ -130,9 +132,10 @@ class BHandGUI(Plugin):
 		self._joint_states_topic = '/joint_states'
 		self._tact_topic = '/%s/tact_array'%self.bhand_node_name 
 		self._command_topic = '/%s/command'%self.bhand_node_name 
+		self._tactile_info_topic = '/%s/tactile_info'%self.bhand_node_name
 		self._set_mode_service_name = '/%s/set_control_mode'%self.bhand_node_name
 		self._actions_service_name = '/%s/actions'%self.bhand_node_name
-		 
+
 		# Saves the desired value
 		self.desired_ref = JointState()
 		
@@ -170,6 +173,11 @@ class BHandGUI(Plugin):
 		# PUBLICATIONS
 		try:
 			self._publisher_command = rospy.Publisher(self._command_topic, JointState, queue_size=10)
+		except ROSException, e:
+			rospy.logerr('BHandGUI: Error creating publisher for topic %s (%s)'%(self._command_topic, e))
+
+		try:
+			self._publisher_tactile_info = rospy.Publisher(self._tactile_info_topic, TactileInfo, queue_size=10)
 		except ROSException, e:
 			rospy.logerr('BHandGUI: Error creating publisher for topic %s (%s)'%(self._command_topic, e))
 		
@@ -387,7 +395,7 @@ class BHandGUI(Plugin):
 		self._publisher_command.publish(self.desired_ref)
 		
 		
-	def	fingers_check_box_pressed(self, state):
+	def fingers_check_box_pressed(self, state):
 		'''
 			Handler call when clicking checkbox to control all fingers
 		'''
@@ -456,25 +464,25 @@ class BHandGUI(Plugin):
 		self._topic_dspic_timer = time.time()
 		
 		if not self._topic_dspic_connected:
-			rospy.loginfo('BHandGUI: connection stablished with %s'%self._topic_dspic)
+			rospy.loginfo('BHandGUI: connection established with %s'%self._topic_dspic)
 			self._topic_dspic_connected = True
 	
 			
 	# Handles the press event of the button dspic reset odom
-	def press_reset_dspic_odom(self):	
+	def press_reset_dspic_odom(self):   
 		
-		ret = QMessageBox.question(self._widget, "Dspic Reset Odometry", 'Are you sure of resetting the odometry?', QMessageBox.Ok, QMessageBox.Cancel)
+		ret = QMessageBox.question(self._widget, "Dspic Reset Odometry", 'Are you sure you want to reset the odometry?', QMessageBox.Ok, QMessageBox.Cancel)
 		
 		if ret == QMessageBox.Ok:
 			
 			# Call the service recalibrate dspic
 			try:
-				ret = self._service_dspic_reset_odom(0.0, 0.0, 0.0, 0.0)				
+				ret = self._service_dspic_reset_odom(0.0, 0.0, 0.0, 0.0)                
 			except ValueError, e:
 				rospy.logerr('BHandGUI::press_reset_dspic_odom: (%s)'%e)
 			except rospy.ServiceException, e:
 				rospy.logerr('BHandGUI::press_reset_dspic_odom: (%s)'%e)
-				QMessageBox.warning(self._widget, "Warning", "Servicio no disponible")
+				QMessageBox.warning(self._widget, "Warning", "service is not available: press_reset_dspic_odom")
 	
 	
 	def enable_command_vel_changed(self, value):
@@ -486,14 +494,14 @@ class BHandGUI(Plugin):
 			self._widget.checkBox_enable_control_pos.setChecked(True)
 			self.enable_commands = True
 			#if self._bhand_data.control_mode == 'VELOCITY':
-			#	self._timer_commands.start(BHAND_VELOCITY_COMMANDS_FREQ)
+			#   self._timer_commands.start(BHAND_VELOCITY_COMMANDS_FREQ)
 				
 				 
 		else:
 			self._widget.checkBox_enable_control_pos.setChecked(False)
 			self.enable_commands = False
 			#if self._bhand_data.control_mode == 'VELOCITY':
-			#	self._timer_commands.stop()
+			#   self._timer_commands.stop()
 			
 			
 	
@@ -527,34 +535,34 @@ class BHandGUI(Plugin):
 		self._timer_commands.start(BHAND_VELOCITY_COMMANDS_FREQ)
 	
 
-	def set_control_mode(self, mode):	
+	def set_control_mode(self, mode):   
 		'''
 			Calls the service to set the control mode of the hand
 			@param mode: Desired Bhand mode of operation ('POSITION', 'VELOCITY')
 			@type mode: string
-		'''			
+		'''         
 		try:
-			ret = self._service_set_mode(mode)				
+			ret = self._service_set_mode(mode)              
 		except ValueError, e:
 			rospy.logerr('BHandGUI::set_control_mode: (%s)'%e)
 		except rospy.ServiceException, e:
 			rospy.logerr('BHandGUI::set_control_mode: (%s)'%e)
-			QMessageBox.warning(self._widget, "Warning", "Servicio no disponible")
+			QMessageBox.warning(self._widget, "Warning", "Service is not available: set_control_mode")
 	
 	
-	def send_bhand_action(self, action):	
+	def send_bhand_action(self, action):    
 		'''
 			Calls the service to set the control mode of the hand
 			@param action: Action number (defined in msgs/Service.msg)
 			@type action: int
-		'''			
+		'''         
 		try:
-			ret = self._service_bhand_actions(action)				
+			ret = self._service_bhand_actions(action)               
 		except ValueError, e:
 			rospy.logerr('BHandGUI::send_bhand_action: (%s)'%e)
 		except rospy.ServiceException, e:
 			rospy.logerr('BHandGUI::send_bhand_action: (%s)'%e)
-			QMessageBox.warning(self._widget, "Warning", "Servicio no disponible")
+			QMessageBox.warning(self._widget, "Warning", "Service is not available: send_bhand_action")
 						
 	
 	def send_velocity_command(self):
@@ -570,7 +578,7 @@ class BHandGUI(Plugin):
 
 	def timeout_command_timer(self):
 		'''
-			Handles every timeout triggered by the Qtimer for sending commands	
+			Handles every timeout triggered by the Qtimer for sending commands  
 		'''
 		if self.enable_commands and self._bhand_data.control_mode == 'VELOCITY':
 			self.send_velocity_command()
@@ -599,7 +607,34 @@ class BHandGUI(Plugin):
 		self._publisher_command.unregister()
 		self._service_bhand_actions.close()
 		self._service_set_mode.close()
-		
+
+
+	def getPosition(self, location_name):
+		listener = tf.TransformListener()
+		try:
+			(trans,rot) = listener.lookupTransform(location_name, '/world', rospy.Time(0))
+		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+			return None
+
+		pose_stamped = PoseStamped()
+		pose_stamped.pose.position.x = trans[0]
+		pose_stamped.pose.position.y = trans[1]
+		pose_stamped.pose.position.z = trans[2]
+
+		quat = pm.transformations.quaternion_from_euler(rot[0], rot[1], rot[2])
+		pose_stamped.pose.orientation.x = quat[0]
+		pose_stamped.pose.orientation.y = quat[1]
+		pose_stamped.pose.orientation.z = quat[2]
+		pose_stamped.pose.orientation.w = quat[3]
+
+		pose_stamped.header.frame_id = '/world'
+
+		return pose_stamped
+
+
+	def publishLocations(self, location_list):
+		msg = TactileInfo(location_list)
+		self._tactile_info_topic.publish(msg)
 	
 	# Method executed periodically
 	# Updates the graphical qt components
@@ -613,7 +648,7 @@ class BHandGUI(Plugin):
 		else:
 			self._widget.checkBox_hand_initialized.setChecked(0)
 		
-		#State		
+		#State      
 		if self._bhand_data.state == 100:
 			self.state_string = "INIT_STATE"
 		elif self._bhand_data.state == 200:
@@ -681,6 +716,8 @@ class BHandGUI(Plugin):
 		
 		if self._tact_data is not None and self._bhand_data.state == 300:
 			
+			activated_positions = []
+
 			#Finger 1
 			for i in range(0,8):
 				for j in range(0,3):
@@ -698,6 +735,11 @@ class BHandGUI(Plugin):
 					else:
 						color_string = self.black_string
 					getattr(self._widget,lcd_string).setStyleSheet(color_string)
+
+					if self.THRESHOLD <= value:
+						val = self.getPosition("bh_link1_sensor{}_link".format(tact_to_finger1_map[value]))
+						if val is not None:
+							activated_positions.append(val)
 		
 			#Finger 2
 			for i in range(0,8):
@@ -716,12 +758,18 @@ class BHandGUI(Plugin):
 					else:
 						color_string = self.black_string
 					getattr(self._widget,lcd_string).setStyleSheet(color_string)
+
+					if self.THRESHOLD <= value:
+						val = self.getPosition("bh_link2_sensor{}_link".format(tact_to_finger2_map[value]))
+						if val is not None:
+							activated_positions.append(val)
 				
 			#Finger 3
 			for i in range(0,8):
 				for j in range(0,3):
 					lcd_string = "lcdNumber" + str(i*3 + j) + "_4"
 					value = round(self._tact_data.finger3[(7-i)*3 + j], 1)
+
 					getattr(self._widget,lcd_string).display(value)
 					if 0.0 <= value and value < 4.0:
 						color_string = self.green_string
@@ -736,7 +784,9 @@ class BHandGUI(Plugin):
 					getattr(self._widget,lcd_string).setStyleSheet(color_string)
 
 					if self.THRESHOLD <= value:
-						self.publishLocation("bh_finger{}_tact{}", value)
+						val = self.getPosition("bh_link3_sensor{}_link".format(tact_to_finger3_map[value]))
+						if val is not None:
+							activated_positions.append(val)
 				
 			#Palm
 			for i in range(0,24):
@@ -754,6 +804,13 @@ class BHandGUI(Plugin):
 				else:
 					color_string = self.black_string
 				getattr(self._widget,lcd_string).setStyleSheet(color_string)
+
+				if self.THRESHOLD <= value:
+					val = self.getPosition("bh_palm_sensor{}_link".format(tact_to_palm_map[value]))
+					if val is not None:
+						activated_positions.append()
+
+			self.publishLocations(activated_positions)
 		
 		
 		# Checks the ROS connection
