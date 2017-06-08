@@ -614,6 +614,7 @@ class BHandGUI(Plugin):
 		try:
 			(trans,rot) = listener.lookupTransform(location_name, '/world', rospy.Time(0))
 		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+			print("Could not lookup transform to world")
 			return None
 
 		pose_stamped = PoseStamped()
@@ -633,7 +634,8 @@ class BHandGUI(Plugin):
 
 
 	def publishLocations(self, location_list):
-		msg = TactileInfo(location_list)
+		msg = TactileInfo()
+		msg.tactile_info = location_list
 		self._tactile_info_topic.publish(msg)
 	
 	# Method executed periodically
