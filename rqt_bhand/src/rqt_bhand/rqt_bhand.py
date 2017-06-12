@@ -80,7 +80,9 @@ class BHandGUI(Plugin):
 		
 		# Flag to enable sending commands
 		self.enable_commands = False
-		
+
+		# Threshold for tactile high
+		self.THRESHOLD = 0.5
 		
 		#Variable inits
 		# DESIRED POSITION
