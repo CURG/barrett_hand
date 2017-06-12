@@ -82,7 +82,7 @@ class BHandGUI(Plugin):
 		self.enable_commands = False
 
 		# Threshold for tactile high
-		self.THRESHOLD = 0.5
+		self.THRESHOLD = 2.0
 		
 		#Variable inits
 		# DESIRED POSITION
@@ -108,6 +108,8 @@ class BHandGUI(Plugin):
 		self.finger_factor = max_finger_spread/99
 		
 		self.state_string = " "
+
+		self.listener = tf.TransformListener()
 		
 
 		# UI
@@ -612,11 +614,12 @@ class BHandGUI(Plugin):
 
 
 	def getPosition(self, location_name):
-		listener = tf.TransformListener()
+		now = rospy.Time.now()
+		self.listener.waitForTransform(location_name, "world", now, rospy.Duration(4.0))
 		try:
-			(trans,rot) = listener.lookupTransform(location_name, '/world', rospy.Time(0))
+			(trans,rot) = self.listener.lookupTransform(location_name, 'world', now)
 		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-			print("Could not lookup transform to world")
+			rospy.logerr("Could not lookup transform {} to world".format(location_name))
 			return None
 
 		pose_stamped = PoseStamped()
@@ -638,7 +641,7 @@ class BHandGUI(Plugin):
 	def publishLocations(self, location_list):
 		msg = TactileInfo()
 		msg.tactile_info = location_list
-		self._tactile_info_topic.publish(msg)
+		self._publisher_tactile_info.publish(msg)
 	
 	# Method executed periodically
 	# Updates the graphical qt components
@@ -726,7 +729,8 @@ class BHandGUI(Plugin):
 			for i in range(0,8):
 				for j in range(0,3):
 					lcd_string = "lcdNumber" + str(i*3 + j)
-					value = round(self._tact_data.finger1[(7-i)*3 + j ], 1)
+					tact_array_index = (7-i)*3 + j
+					value = round(self._tact_data.finger1[(7-i)*3 + j], 1)
 					getattr(self._widget,lcd_string).display(value)
 					if 0.0 <= value and value < 4.0:
 						color_string = self.green_string
@@ -741,7 +745,7 @@ class BHandGUI(Plugin):
 					getattr(self._widget,lcd_string).setStyleSheet(color_string)
 
 					if self.THRESHOLD <= value:
-						val = self.getPosition("bh_link1_sensor{}_link".format(tact_to_finger1_map[value]))
+						val = self.getPosition("bh_link1_sensor{}_link".format(tact_to_finger1_map[tact_array_index]))
 						if val is not None:
 							activated_positions.append(val)
 		
@@ -749,7 +753,8 @@ class BHandGUI(Plugin):
 			for i in range(0,8):
 				for j in range(0,3):
 					lcd_string = "lcdNumber" + str(i*3 + j) + "_3"
-					value = round(self._tact_data.finger2[(7-i)*3 + j ], 1)
+					tact_array_index = (7-i)*3 + j
+					value = round(self._tact_data.finger2[tact_array_index], 1)
 					getattr(self._widget,lcd_string).display(value)
 					if 0.0 <= value and value < 4.0:
 						color_string = self.green_string
@@ -764,7 +769,7 @@ class BHandGUI(Plugin):
 					getattr(self._widget,lcd_string).setStyleSheet(color_string)
 
 					if self.THRESHOLD <= value:
-						val = self.getPosition("bh_link2_sensor{}_link".format(tact_to_finger2_map[value]))
+						val = self.getPosition("bh_link2_sensor{}_link".format(tact_to_finger2_map[tact_array_index]))
 						if val is not None:
 							activated_positions.append(val)
 				
@@ -772,7 +777,8 @@ class BHandGUI(Plugin):
 			for i in range(0,8):
 				for j in range(0,3):
 					lcd_string = "lcdNumber" + str(i*3 + j) + "_4"
-					value = round(self._tact_data.finger3[(7-i)*3 + j], 1)
+					tact_array_index = (7-i)*3 + j
+					value = round(self._tact_data.finger3[tact_array_index], 1)
 
 					getattr(self._widget,lcd_string).display(value)
 					if 0.0 <= value and value < 4.0:
@@ -788,14 +794,15 @@ class BHandGUI(Plugin):
 					getattr(self._widget,lcd_string).setStyleSheet(color_string)
 
 					if self.THRESHOLD <= value:
-						val = self.getPosition("bh_link3_sensor{}_link".format(tact_to_finger3_map[value]))
+						val = self.getPosition("bh_link3_sensor{}_link".format(tact_to_finger3_map[tact_array_index]))
 						if val is not None:
 							activated_positions.append(val)
 				
 			#Palm
 			for i in range(0,24):
 				lcd_string = "lcdNumber" + str(i) + "_6"
-				value = round(self._tact_data.palm[i], 1)
+				tact_array_index = i
+				value = round(self._tact_data.palm[tact_array_index], 1)
 				getattr(self._widget,lcd_string).display(value)
 				if 0.0 <= value and value < 2.5:
 					color_string = self.green_string
@@ -810,11 +817,13 @@ class BHandGUI(Plugin):
 				getattr(self._widget,lcd_string).setStyleSheet(color_string)
 
 				if self.THRESHOLD <= value:
-					val = self.getPosition("bh_palm_sensor{}_link".format(tact_to_palm_map[value]))
+					val = self.getPosition("bh_palm_sensor_{}_link".format(tact_to_palm_map[tact_array_index]))
+					print(self.THRESHOLD, value, val)
 					if val is not None:
-						activated_positions.append()
+						activated_positions.append(val)
 
-			self.publishLocations(activated_positions)
+			if len(activated_positions) > 0:
+				self.publishLocations(activated_positions)
 		
 		
 		# Checks the ROS connection
