@@ -82,7 +82,14 @@ class BHandGUI(Plugin):
 		self.enable_commands = False
 
 		# Threshold for tactile high
-		self.THRESHOLD = 2.0
+		self.THRESHOLD = 1.0
+
+		self.threshold_values = {}
+		self.threshold_values["num_values"] = 0
+		self.threshold_values["link1"] = []
+		self.threshold_values["link2"] = []
+		self.threshold_values["link3"] = []
+		self.threshold_values["palm"]  = []
 		
 		#Variable inits
 		# DESIRED POSITION
@@ -427,7 +434,7 @@ class BHandGUI(Plugin):
 		self._topic_timer = time.time()
 		
 		if not self._topic_connected:
-			rospy.loginfo('BHandGUI: connection stablished with %s'%self._topic)
+			rospy.loginfo('BHandGUI: connection established with %s'%self._topic)
 			self._topic_connected = True
 	
 	
@@ -446,7 +453,7 @@ class BHandGUI(Plugin):
 			
 		
 		if not self._topic_joint_states_connected:
-			rospy.loginfo('Bhand: connection stablished with %s'%self._joint_states_topic)
+			rospy.loginfo('Bhand: connection established with %s'%self._joint_states_topic)
 			self._topic_joint_states_connected = True
 		
 		
@@ -614,26 +621,36 @@ class BHandGUI(Plugin):
 
 
 	def getPosition(self, location_name):
-		now = rospy.Time.now()
-		self.listener.waitForTransform(location_name, "world", now, rospy.Duration(4.0))
-		try:
-			(trans,rot) = self.listener.lookupTransform(location_name, 'world', now)
-		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-			rospy.logerr("Could not lookup transform {} to world".format(location_name))
-			return None
+		# now = rospy.Time.now()
+		# self.listener.waitForTransform(location_name, "world", now, rospy.Duration(4.0))
+		# try:
+		# 	(trans,rot) = self.listener.lookupTransform(location_name, 'world', now)
+		# except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+		# 	rospy.logerr("Could not lookup transform {} to world".format(location_name))
+		# 	return None
+
+		# pose_stamped = PoseStamped()
+		# pose_stamped.pose.position.x = trans[0]
+		# pose_stamped.pose.position.y = trans[1]
+		# pose_stamped.pose.position.z = trans[2]
+
+		# quat = pm.transformations.quaternion_from_euler(rot[0], rot[1], rot[2])
+		# pose_stamped.pose.orientation.x = quat[0]
+		# pose_stamped.pose.orientation.y = quat[1]
+		# pose_stamped.pose.orientation.z = quat[2]
+		# pose_stamped.pose.orientation.w = quat[3]
 
 		pose_stamped = PoseStamped()
-		pose_stamped.pose.position.x = trans[0]
-		pose_stamped.pose.position.y = trans[1]
-		pose_stamped.pose.position.z = trans[2]
+		pose_stamped.pose.position.x = 0
+		pose_stamped.pose.position.y = 0
+		pose_stamped.pose.position.z = 0
 
-		quat = pm.transformations.quaternion_from_euler(rot[0], rot[1], rot[2])
-		pose_stamped.pose.orientation.x = quat[0]
-		pose_stamped.pose.orientation.y = quat[1]
-		pose_stamped.pose.orientation.z = quat[2]
-		pose_stamped.pose.orientation.w = quat[3]
+		pose_stamped.pose.orientation.x = 0
+		pose_stamped.pose.orientation.y = 0
+		pose_stamped.pose.orientation.z = 0
+		pose_stamped.pose.orientation.w = 1
 
-		pose_stamped.header.frame_id = '/world'
+		pose_stamped.header.frame_id = location_name
 
 		return pose_stamped
 
@@ -642,6 +659,31 @@ class BHandGUI(Plugin):
 		msg = TactileInfo()
 		msg.tactile_info = location_list
 		self._publisher_tactile_info.publish(msg)
+
+	def updateLCD(self, tact_array_index, lcd_number, lcd_tag, tact_to_sensor_map, link_name, sensor_name, finger_array):
+
+		lcd_string = "lcdNumber{}{}".format(lcd_number, lcd_tag)
+		offset = self.threshold_values[link_name][lcd_number]
+		value = max(0.0, round(finger_array[tact_array_index] - offset, 1))
+
+		getattr(self._widget,lcd_string).display(value)
+		if 0.0 <= value and value < 4.0:
+			color_string = self.green_string
+		elif 4.0 <= value and value < 8.0:
+			color_string = self.yellow_string
+		elif 8.0 <= value and value < 12.0:
+			color_string = self.orange_string
+		elif 12.0 <= value and value <= 16.0:
+			color_string = self.red_string
+		else:
+			color_string = self.black_string
+		getattr(self._widget,lcd_string).setStyleSheet(color_string)
+
+		if self.THRESHOLD <= value:
+			return self.getPosition(sensor_name.format(tact_to_sensor_map[tact_array_index]))
+
+		return None
+
 	
 	# Method executed periodically
 	# Updates the graphical qt components
@@ -720,111 +762,82 @@ class BHandGUI(Plugin):
 		#self.green = 255
 		#self.blue = 0
 		#color_string = "background-color: rgb(" + str(self.red) + "," + str(self.green) + "," + str(self.blue) + ")"
+
+		# rospy.logerr("Hello am I here 1")
 		
 		if self._tact_data is not None and self._bhand_data.state == 300:
+
+			if self.threshold_values["num_values"] == 0:
+				for i in range(0,8):
+					for j in range(0,3):
+						index = (7-i)*3 + j
+						self.threshold_values["link1"].append(self._tact_data.finger1[index])
+						self.threshold_values["link2"].append(self._tact_data.finger2[index])
+						self.threshold_values["link3"].append(self._tact_data.finger3[index])
+
+				for i in range(0, 24):
+					self.threshold_values["palm"].append(self._tact_data.palm[i])
+
+			# elif self.threshold_values["num_values"] < 100:
+			# 	for i in range(0,8):
+			# 		for j in range(0,3):
+			# 			index = 3*i + j
+			# 			tact_index = (7-i)*3 + j
+			# 			self.threshold_values["link1"][index] += (self._tact_data.finger1[index])
+			# 			self.threshold_values["link2"][index] += (self._tact_data.finger2[index])
+			# 			self.threshold_values["link3"][index] += (self._tact_data.finger3[index])
+
+			# 	for i in range(0, 24):
+			# 		self.threshold_values["palm"][i] += (self._tact_data.palm[i])
+
+			# elif self.threshold_values["num_values"] == 100:
+			# 	for i in range(0,8):
+			# 		for j in range(0,3):
+			# 			index = 3*i + j
+			# 			tact_index = (7-i)*3 + j
+			# 			self.threshold_values["link1"][index] /= 100.0
+			# 			self.threshold_values["link2"][index] /= 100.0
+			# 			self.threshold_values["link3"][index] /= 100.0
+
+			# 	for i in range(0, 24):
+			# 		self.threshold_values["palm"][i] /= 100.0
+
+			# 	rospy.logerr(self.threshold_values)
+
+			self.threshold_values["num_values"] += 1
+
+			# rospy.logerr(self.threshold_values)
+			# rospy.logerr("Hello am I here")
 			
 			activated_positions = []
 
-			#Finger 1
+			# Loop over finger positions
 			for i in range(0,8):
 				for j in range(0,3):
-					lcd_string = "lcdNumber" + str(i*3 + j)
-					tact_array_index = (7-i)*3 + j
-					value = round(self._tact_data.finger1[(7-i)*3 + j], 1)
-					getattr(self._widget,lcd_string).display(value)
-					if 0.0 <= value and value < 4.0:
-						color_string = self.green_string
-					elif 4.0 <= value and value < 8.0:
-						color_string = self.yellow_string
-					elif 8.0 <= value and value < 12.0:
-						color_string = self.orange_string
-					elif 12.0 <= value and value <= 16.0:
-						color_string = self.red_string
-					else:
-						color_string = self.black_string
-					getattr(self._widget,lcd_string).setStyleSheet(color_string)
-
-					if self.THRESHOLD <= value:
-						val = self.getPosition("bh_link1_sensor{}_link".format(tact_to_finger1_map[tact_array_index]))
-						if val is not None:
-							activated_positions.append(val)
-		
-			#Finger 2
-			for i in range(0,8):
-				for j in range(0,3):
-					lcd_string = "lcdNumber" + str(i*3 + j) + "_3"
-					tact_array_index = (7-i)*3 + j
-					value = round(self._tact_data.finger2[tact_array_index], 1)
-					getattr(self._widget,lcd_string).display(value)
-					if 0.0 <= value and value < 4.0:
-						color_string = self.green_string
-					elif 4.0 <= value and value < 8.0:
-						color_string = self.yellow_string
-					elif 8.0 <= value and value < 12.0:
-						color_string = self.orange_string
-					elif 12.0 <= value and value <= 16.0:
-						color_string = self.red_string
-					else:
-						color_string = self.black_string
-					getattr(self._widget,lcd_string).setStyleSheet(color_string)
-
-					if self.THRESHOLD <= value:
-						val = self.getPosition("bh_link2_sensor{}_link".format(tact_to_finger2_map[tact_array_index]))
-						if val is not None:
-							activated_positions.append(val)
-				
-			#Finger 3
-			for i in range(0,8):
-				for j in range(0,3):
-					lcd_string = "lcdNumber" + str(i*3 + j) + "_4"
-					tact_array_index = (7-i)*3 + j
-					value = round(self._tact_data.finger3[tact_array_index], 1)
-
-					getattr(self._widget,lcd_string).display(value)
-					if 0.0 <= value and value < 4.0:
-						color_string = self.green_string
-					elif 4.0 <= value and value < 8.0:
-						color_string = self.yellow_string
-					elif 8.0 <= value and value < 12.0:
-						color_string = self.orange_string
-					elif 12.0 <= value and value <= 16.0:
-						color_string = self.red_string
-					else:
-						color_string = self.black_string
-					getattr(self._widget,lcd_string).setStyleSheet(color_string)
-
-					if self.THRESHOLD <= value:
-						val = self.getPosition("bh_link3_sensor{}_link".format(tact_to_finger3_map[tact_array_index]))
-						if val is not None:
-							activated_positions.append(val)
-				
-			#Palm
-			for i in range(0,24):
-				lcd_string = "lcdNumber" + str(i) + "_6"
-				tact_array_index = i
-				value = round(self._tact_data.palm[tact_array_index], 1)
-				getattr(self._widget,lcd_string).display(value)
-				if 0.0 <= value and value < 2.5:
-					color_string = self.green_string
-				elif 2.5 <= value and value < 5.0:
-					color_string = self.yellow_string
-				elif 5.0 <= value and value < 7.5:
-					color_string = self.orange_string
-				elif 7.5 <= value and value <= 16.0:
-					color_string = self.red_string
-				else:
-					color_string = self.black_string
-				getattr(self._widget,lcd_string).setStyleSheet(color_string)
-
-				if self.THRESHOLD <= value:
-					val = self.getPosition("bh_palm_sensor_{}_link".format(tact_to_palm_map[tact_array_index]))
-					print(self.THRESHOLD, value, val)
+					# Finger 1
+					val = self.updateLCD((7-i)*3 + j, i*3 + j, "", tact_to_finger1_map, "link1", "bh_link1_sensor{}_link", self._tact_data.finger1)
 					if val is not None:
 						activated_positions.append(val)
 
+					# Finger 2
+					val = self.updateLCD((7-i)*3 + j, i*3 + j, "_3", tact_to_finger2_map, "link2", "bh_link2_sensor{}_link", self._tact_data.finger2)
+					if val is not None:
+						activated_positions.append(val)
+
+					# Finger 3
+					val = self.updateLCD((7-i)*3 + j, i*3 + j, "_4", tact_to_finger3_map, "link3", "bh_link3_sensor{}_link", self._tact_data.finger3)
+					if val is not None:
+						activated_positions.append(val)
+				
+			#Palm
+			for i in range(0,24):
+				val = self.updateLCD(i, i, "_6", tact_to_palm_map, "palm", "bh_palm_sensor_{}_link", self._tact_data.palm)
+				if val is not None:
+					activated_positions.append(val)
+
 			if len(activated_positions) > 0:
 				self.publishLocations(activated_positions)
-		
+
 		
 		# Checks the ROS connection
 		t = time.time()
