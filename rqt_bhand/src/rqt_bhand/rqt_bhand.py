@@ -744,10 +744,10 @@ class BHandGUI(Plugin):
 						color_string = self.black_string
 					getattr(self._widget,lcd_string).setStyleSheet(color_string)
 
-					if self.THRESHOLD <= value:
-						val = self.getPosition("bh_link1_sensor{}_link".format(tact_to_finger1_map[tact_array_index]))
-						if val is not None:
-							activated_positions.append(val)
+					# if self.THRESHOLD <= value:
+					# 	val = self.getPosition("bh_link1_sensor{}_link".format(tact_to_finger1_map[tact_array_index]))
+					# 	if val is not None:
+					# 		activated_positions.append(val)
 		
 			#Finger 2
 			for i in range(0,8):
@@ -768,10 +768,10 @@ class BHandGUI(Plugin):
 						color_string = self.black_string
 					getattr(self._widget,lcd_string).setStyleSheet(color_string)
 
-					if self.THRESHOLD <= value:
-						val = self.getPosition("bh_link2_sensor{}_link".format(tact_to_finger2_map[tact_array_index]))
-						if val is not None:
-							activated_positions.append(val)
+					# if self.THRESHOLD <= value:
+					# 	val = self.getPosition("bh_link2_sensor{}_link".format(tact_to_finger2_map[tact_array_index]))
+					# 	if val is not None:
+					# 		activated_positions.append(val)
 				
 			#Finger 3
 			for i in range(0,8):
@@ -793,10 +793,10 @@ class BHandGUI(Plugin):
 						color_string = self.black_string
 					getattr(self._widget,lcd_string).setStyleSheet(color_string)
 
-					if self.THRESHOLD <= value:
-						val = self.getPosition("bh_link3_sensor{}_link".format(tact_to_finger3_map[tact_array_index]))
-						if val is not None:
-							activated_positions.append(val)
+					# if self.THRESHOLD <= value:
+					# 	val = self.getPosition("bh_link3_sensor{}_link".format(tact_to_finger3_map[tact_array_index]))
+					# 	if val is not None:
+					# 		activated_positions.append(val)
 				
 			#Palm
 			for i in range(0,24):
@@ -816,14 +816,14 @@ class BHandGUI(Plugin):
 					color_string = self.black_string
 				getattr(self._widget,lcd_string).setStyleSheet(color_string)
 
-				if self.THRESHOLD <= value:
-					val = self.getPosition("bh_palm_sensor_{}_link".format(tact_to_palm_map[tact_array_index]))
-					print(self.THRESHOLD, value, val)
-					if val is not None:
-						activated_positions.append(val)
+				# if self.THRESHOLD <= value:
+				# 	val = self.getPosition("bh_palm_sensor_{}_link".format(tact_to_palm_map[tact_array_index]))
+				# 	print(self.THRESHOLD, value, val)
+				# 	if val is not None:
+				# 		activated_positions.append(val)
 
-			if len(activated_positions) > 0:
-				self.publishLocations(activated_positions)
+			# if len(activated_positions) > 0:
+			# 	self.publishLocations(activated_positions)
 		
 		
 		# Checks the ROS connection
