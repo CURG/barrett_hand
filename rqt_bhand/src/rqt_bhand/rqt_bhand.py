@@ -30,13 +30,15 @@
 
 from __future__ import division
 import os
+from PyQt5.QtWidgets import *
 import rospkg
 import threading
 
 import rospy
 from python_qt_binding import loadUi
-from python_qt_binding.QtCore import Qt, QTimer, Slot, QBasicTimer, SIGNAL
-from python_qt_binding.QtGui import QKeySequence, QShortcut, QWidget, QPixmap, QMessageBox, QStandardItemModel,QStandardItem
+from python_qt_binding.QtCore import Qt, QTimer, Slot, QBasicTimer
+from python_qt_binding.QtGui import QKeySequence, QPixmap, QStandardItemModel,QStandardItem
+from python_qt_binding.QtWidgets import QWidget, QMessageBox
 from rqt_gui_py.plugin import Plugin
 
 import time
@@ -201,14 +203,14 @@ class BHandGUI(Plugin):
 		self._widget.horizontalSlider_v_f2.valueChanged.connect(self.slider_v_f2_changed)
 		self._widget.horizontalSlider_v_f3.valueChanged.connect(self.slider_v_f3_changed)
 		
-		self.connect(self._widget.checkBox_enable_control_vel, SIGNAL("stateChanged(int)"),  self.enable_command_vel_changed)
-		self.connect(self._widget.checkBox_enable_control_pos, SIGNAL("stateChanged(int)"),  self.enable_command_pos_changed)
+		self._widget.checkBox_enable_control_vel.stateChanged[int].connect(self.enable_command_vel_changed)
+		self._widget.checkBox_enable_control_pos.stateChanged[int].connect(self.enable_command_pos_changed)
 		self._widget.checkBox_enable_control_vel.setChecked(False)
 		
 		#self._widget.radioButtonPosition.clicked.connect(self.radio_button_position_clicked)
 		#self._widget.radioButtonVelocity.clicked.connect(self.radio_button_velocity_clicked)
-		self.connect(self._widget.radioButtonPosition, SIGNAL("clicked(bool)"),  self.radio_button_position_clicked)
-		self.connect(self._widget.radioButtonVelocity, SIGNAL("clicked(bool)"),  self.radio_button_velocity_clicked)
+		self._widget.radioButtonPosition.clicked[bool].connect(self.radio_button_position_clicked)
+		self._widget.radioButtonVelocity.clicked[bool].connect(self.radio_button_velocity_clicked)
 		
 		
 		self._widget.checkBox.stateChanged.connect(self.fingers_check_box_pressed)
@@ -251,7 +253,7 @@ class BHandGUI(Plugin):
 		self._timer.start(1, self)
 		# Creates a timer to send command refs periodically
 		self._timer_commands = QTimer()
-		self.connect(self._timer_commands, SIGNAL("timeout()"),  self.timeout_command_timer)
+		self._timer_commands.timeout.connect(self.timeout_command_timer)
 		
 	def start_button_pressed(self):
 		'''
